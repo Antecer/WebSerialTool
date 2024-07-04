@@ -675,7 +675,6 @@
 
     //添加日志
     function addLog(data, isReceive = true) {
-        console.log(data)
         let time = formatDate(new Date())
         let msgSrc = isReceive ? 'RX' : 'TX'
         let msgType = toolOptions.logType == 'hex';

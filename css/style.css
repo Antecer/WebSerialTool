@@ -1,3 +1,8 @@
+@font-face {
+    font-family: 'hack-regular';
+    src: url('../res/fonts/Hack-Regular.ttf') format('truetype');
+}
+
 :root {
     --top-height: 63px;
 }
@@ -20,6 +25,7 @@ body {
 #serial-logs {
     overflow-y: scroll;
     white-space: pre-wrap;
+    font-family: 'hack-regular';
 }
 #serial-options,
 #serial-tools {

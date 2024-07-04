@@ -1,6 +1,6 @@
 (function () {
     if (!('serial' in navigator)) {
-        alert('当前浏览器不支持串口操作,请更换Edge或Chrome浏览器')
+        alert('当前浏览器不支持串口操作,请更换Chrome浏览器')
     }
     let serialPort = null
     navigator.serial.getPorts().then((ports) => {
@@ -123,9 +123,9 @@
         //显示时间 界面未开放
         showTime: true,
         //日志类型
-        logType: 'hex&ascii',
+        logType: 'ascii',
         //分包合并时间
-        timeOut: 50,
+        timeOut: 0,
         //末尾加回车换行
         addCRLF: false,
         //HEX发送
@@ -659,32 +659,33 @@
         await serialPort.close()
     }
 
-    //串口分包合并
+    // 串口数据分包函数
     function dataReceived(data) {
         serialData.push(...data)
         if (toolOptions.timeOut == 0) {
-            addLog(serialData, true)
-            serialData = []
+            for (let i = serialData.length; i-- > 0;) {
+                if (serialData[i] == 10) {
+                    ++i;
+                    let arrLt = serialData.slice(0, i);
+                    serialData = serialData.slice(i);
+                    addLog(arrLt, true)
+                }
+            }
             return
         }
-        //清除之前的时钟
+        // 清除之前的时钟
         clearTimeout(serialTimer)
         serialTimer = setTimeout(() => {
-            //超时发出
-            addLog(serialData, true)
+            console.log(serialData);
+            addLog(serialData, true)    // 超时打印
             serialData = []
         }, toolOptions.timeOut)
     }
 
     //添加日志
     function addLog(data, isReceive = true) {
-        let classname = 'text-primary'
-        let form = '→'
-        if (isReceive) {
-            classname = 'text-success'
-            form = '←'
-        }
-        newmsg = ''
+        let classname = isReceive ? 'text-rx' : 'text-tx'
+        let newmsg = ''
         if (toolOptions.logType.includes('hex')) {
             let dataHex = []
             for (const d of data) {
@@ -704,7 +705,7 @@
             newmsg += dataAscii
         }
         let time = toolOptions.showTime ? formatDate(new Date()) + '&nbsp;' : ''
-        const template = '<div><span class="' + classname + '">' + time + form + '</span><br>' + newmsg + '</div>'
+        const template = `<div class="${classname}">${newmsg}</div>`
         let tempNode = document.createElement('div')
         tempNode.innerHTML = template
         serialLogs.append(tempNode)

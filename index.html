@@ -122,7 +122,7 @@
                         <div class="input-group input-group-sm me-2">
                             <span class="input-group-text">日志类型</span>
                             <select class="form-select" id="serial-log-type" style="width: 120px">
-                                <option value="ascii">ASCII</option>
+                                <option value="str">STR</option>
                                 <option value="hex">HEX</option>
                             </select>
                         </div>
@@ -142,7 +142,7 @@
                         rows="3"
                         id="serial-send-content"
                         style="resize: none"
-                        placeholder="在此输入要发送的内容,可以是字符串(如:你好,世界!),也可以是HEX(如:49544c4447)"></textarea>
+                        placeholder="在此输入要发送的内容,字符串(如:hello,world!),HEX以空格拆分(如:49 54 4c 44 47)"></textarea>
                     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-1 pb-1 mb-1 flex-shrink-0">
                         <div class="btn-toolbar">
                             <div class="form-check align-self-center me-2">

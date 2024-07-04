@@ -20,10 +20,8 @@
     let serialloopSendTimer = null
     //串口缓存数据
     let serialData = []
-    //文本解码
-    let asciidecoder = new TextDecoder()
-    let currQuickSend = []
     //快捷发送列表
+    let currQuickSend = []
     let quickSendList = [
         {
             name: 'ESP32 AT指令',
@@ -123,7 +121,7 @@
         //显示时间 界面未开放
         showTime: true,
         //日志类型
-        logType: 'ascii',
+        logType: 'str',
         //分包合并时间
         timeOut: 0,
         //末尾加回车换行
@@ -211,17 +209,12 @@
     }
 
     const quickSendContent = document.getElementById('serial-quick-send-content')
-    //快捷发送列表更换选项
+    // 快捷发送列表更换选项
     quickSend.addEventListener('change', (e) => {
         let index = e.target.value
         if (index != -1) {
             changeOption('quickSendIndex', index)
-            currQuickSend = quickSendList[index]
-            //
-            quickSendContent.innerHTML = ''
-            currQuickSend.list.forEach((item) => {
-                quickSendContent.innerHTML += getQuickItemHtml(item)
-            })
+            quickSendContent.innerHTML = quickSendList[index].list.map(item => getQuickItemHtml(item)).join('');
         }
     })
     //添加快捷发送
@@ -232,7 +225,7 @@
             hex: false,
         }
         currQuickSend.list.push(item)
-        quickSendContent.innerHTML += getQuickItemHtml(item)
+        quickSendContent.insertAdjacentHTML('beforeend', getQuickItemHtml(item))
         saveQuickList()
     })
     function getQuickItemHtml(item) {
@@ -251,7 +244,7 @@
                 name: name,
                 list: [],
             })
-            quickSend.innerHTML += `<option value="${quickSendList.length - 1}">${name}</option>`
+            quickSend.insertAdjacentHTML('beforeend', `<option value="${quickSendList.length - 1}">${name}</option>`)
             quickSend.value = quickSendList.length - 1
             quickSend.dispatchEvent(new Event('change'))
             saveQuickList()
@@ -300,9 +293,7 @@
             try {
                 let list = JSON.parse(data)
                 currQuickSend.list.push(...list)
-                list.forEach((item) => {
-                    quickSendContent.innerHTML += getQuickItemHtml(item)
-                })
+                quickSendContent.insertAdjacentHTML('beforeend', list.map(item => getQuickItemHtml(item)).join(''))
                 saveQuickList()
             } catch (e) {
                 showMsg('导入失败:' + e.message)
@@ -618,7 +609,7 @@
         }
     }
 
-    //发送ASCII到串口
+    //发送STR到串口
     async function sendText(text) {
         const encoder = new TextEncoder()
         writeData(encoder.encode(text))
@@ -684,46 +675,24 @@
 
     //添加日志
     function addLog(data, isReceive = true) {
-        let classname = isReceive ? 'text-rx' : 'text-tx'
-        let newmsg = ''
-        if (toolOptions.logType.includes('hex')) {
-            let dataHex = []
-            for (const d of data) {
-                //转16进制并补0
-                dataHex.push(('0' + d.toString(16).toLocaleUpperCase()).slice(-2))
-            }
-            if (toolOptions.logType.includes('&')) {
-                newmsg += 'HEX:'
-            }
-            newmsg += dataHex.join(' ')
-        }
-        if (toolOptions.logType.includes('ascii')) {
-            let dataAscii = asciidecoder.decode(Uint8Array.from(data))
-            if (toolOptions.logType.includes('&')) {
-                newmsg += 'TXT:'
-            }
-            newmsg += dataAscii
-        }
-        let time = toolOptions.showTime ? formatDate(new Date()) + '&nbsp;' : ''
-        const template = `<div class="${classname}">${newmsg}</div>`
-        let tempNode = document.createElement('div')
-        tempNode.innerHTML = template
-        serialLogs.append(tempNode)
+        let time = formatDate(new Date())
+        let msgSrc = isReceive ? 'RX' : 'TX'
+        let msgType = toolOptions.logType == 'hex'
+        let msgHex = data.map(d => d.toString(16).toUpperCase().padStart(2, '0')).join(' ')
+        let msgStr = (new TextDecoder('utf-8')).decode(Uint8Array.from(data))   // todo: 后续从UI获取编码方式
+        const template = `<div class="text-${msgSrc}" title="${msgSrc}[${time}]\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`
+        serialLogs.insertAdjacentHTML('beforeend', template);
         if (toolOptions.autoScroll) {
-            serialLogs.scrollTop = serialLogs.scrollHeight - serialLogs.clientHeight
+            serialLogs.scrollTop = serialLogs.scrollHeight
         }
     }
 
     //系统日志
     function addLogErr(msg) {
-        let time = toolOptions.showTime ? formatDate(new Date()) + '&nbsp;' : ''
-        const template = '<div><span class="text-danger">' + time + ' 系统消息</span><br>' + msg + '</div>'
-        let tempNode = document.createElement('div')
-        tempNode.innerHTML = template
-        serialLogs.append(tempNode)
-        if (toolOptions.autoScroll) {
-            serialLogs.scrollTop = serialLogs.scrollHeight - serialLogs.clientHeight
-        }
+        let time = formatDate(new Date())
+        const template = `<div><span class="text-danger">系统消息[${time}]</span>msg</div>`
+        serialLogs.insertAdjacentHTML('beforeend', template);
+        if (toolOptions.autoScroll) { serialLogs.scrollTop = serialLogs.scrollHeight }
     }
 
     //复制文本

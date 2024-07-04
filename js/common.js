@@ -136,6 +136,8 @@
         sendContent: '',
         //快捷发送选中索引
         quickSendIndex: 0,
+        //文本编码
+        textEncoding: 'utf-8',
     }
 
     //生成快捷发送列表
@@ -173,7 +175,7 @@
                 sendHex(item.content)
                 return
             }
-            sendText(item.content)
+            sendStr(item.content)
         }
     })
     //快捷列表双击改名
@@ -591,28 +593,26 @@
         if (toolOptions.hexSend) {
             await sendHex(content)
         } else {
-            await sendText(content)
+            await sendStr(content)
         }
     }
 
     //发送HEX到串口
+    const regHex = /^([0-9A-Fa-f]{2})+$|^([0-9A-Fa-f]{2})(?:\s+([0-9A-Fa-f]{2}))*$/;
     async function sendHex(hex) {
-        const value = hex.replace(/\s+/g, '')
-        if (/^[0-9A-Fa-f]+$/.test(value) && value.length % 2 === 0) {
-            let data = []
-            for (let i = 0; i < value.length; i = i + 2) {
-                data.push(parseInt(value.substring(i, i + 2), 16))
-            }
+        const value = hex.trim();
+        if (regHex.test(value)) {
+            let data = value.match(/\d\d/g).map(m => parseInt(m, 16))
             await writeData(Uint8Array.from(data))
-        } else {
+        }
+        else {
             addLogErr('HEX格式错误:' + hex)
         }
     }
 
     //发送STR到串口
-    async function sendText(text) {
-        const encoder = new TextEncoder()
-        writeData(encoder.encode(text))
+    async function sendStr(text) {
+        writeData((new TextEncoder(toolOptions.textEncoding)).encode(text))
     }
 
     //写串口数据
@@ -627,7 +627,7 @@
         }
         await writer.write(data)
         writer.releaseLock()
-        addLog(data, false)
+        addLog([...data], false)
     }
 
     //读串口数据
@@ -675,12 +675,13 @@
 
     //添加日志
     function addLog(data, isReceive = true) {
+        console.log(data)
         let time = formatDate(new Date())
         let msgSrc = isReceive ? 'RX' : 'TX'
-        let msgType = toolOptions.logType == 'hex'
+        let msgType = toolOptions.logType == 'hex';
         let msgHex = data.map(d => d.toString(16).toUpperCase().padStart(2, '0')).join(' ')
-        let msgStr = (new TextDecoder('utf-8')).decode(Uint8Array.from(data))   // todo: 后续从UI获取编码方式
-        const template = `<div class="text-${msgSrc}" title="${msgSrc}[${time}]\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`
+        let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(Uint8Array.from(data))   // todo: 后续从UI获取编码方式
+        const template = `<div class="msg-${msgSrc}" title="${msgSrc} [${time}] ${toolOptions.logType == 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`
         serialLogs.insertAdjacentHTML('beforeend', template);
         if (toolOptions.autoScroll) {
             serialLogs.scrollTop = serialLogs.scrollHeight
@@ -690,7 +691,7 @@
     //系统日志
     function addLogErr(msg) {
         let time = formatDate(new Date())
-        const template = `<div><span class="text-danger">系统消息[${time}]</span>msg</div>`
+        const template = `<div><span class="text-danger">系统消息[${time}]</span>${msg}</div>`
         serialLogs.insertAdjacentHTML('beforeend', template);
         if (toolOptions.autoScroll) { serialLogs.scrollTop = serialLogs.scrollHeight }
     }

@@ -60,3 +60,10 @@ body {
     display: flex;
     flex-direction: column;
 }
+
+.msg-RX {
+    color: #000;
+}
+.msg-TX {
+    color: #888;
+}

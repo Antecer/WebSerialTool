@@ -21,7 +21,7 @@
     //串口缓存数据
     let serialData = []
     //快捷发送列表
-    let currQuickSend = []
+    let currQuickSend = { list: [] }
     let quickSendList = [
         {
             name: 'ESP32 AT指令',

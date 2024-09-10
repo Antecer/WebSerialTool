@@ -27,6 +27,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow-y: scroll;
+    word-break: break-all;
     white-space: pre-wrap;
     font-family: 'hack-regular';
 }

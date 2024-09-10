@@ -21,8 +21,11 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    width: 0;
 }
 #serial-logs {
+    display: flex;
+    flex-direction: column;
     overflow-y: scroll;
     white-space: pre-wrap;
     font-family: 'hack-regular';

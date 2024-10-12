@@ -511,8 +511,7 @@
             flowControl: get('serial-flow-control'),
         }
 
-        serialPort
-            .open(SerialOptions)
+        serialPort.open(SerialOptions)
             .then(() => {
                 serialToggle.innerHTML = '关闭串口'
                 serialOpen = true
@@ -522,7 +521,20 @@
                 readData()
             })
             .catch((e) => {
-                showMsg('打开串口失败:' + e.toString())
+                closeSerial()
+                serialPort.open(SerialOptions)
+                    .then(() => {
+                        serialToggle.innerHTML = '关闭串口'
+                        serialOpen = true
+                        serialClose = false
+                        disabledOptions(true)
+                        localStorage.setItem('serialOptions', JSON.stringify(SerialOptions))
+                        readData()
+                    })
+                    .catch((e) => {
+                        closeSerial()
+                        showMsg('打开串口失败:' + e.toString())
+                    })
             })
     }
 

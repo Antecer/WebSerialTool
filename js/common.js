@@ -598,7 +598,7 @@
     }
 
     //发送HEX到串口
-    const regHex = /^[0-9A-Fa-f]{2}(\s*[0-9A-Fa-f]{2})*$/;
+    const regHex = /^[0-9A-Fa-f]{2}(\s+[0-9A-Fa-f]{2})*$/;
     async function sendHex(hex) {
         const value = hex.trim();
         if (regHex.test(value)) {

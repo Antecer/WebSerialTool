@@ -436,7 +436,7 @@
         resetLoopSend()
     })
 
-    //重制发送循环时钟
+    //重置发送循环时钟
     function resetLoopSend() {
         clearInterval(serialloopSendTimer)
         if (toolOptions.loopSend) {
@@ -452,17 +452,13 @@
     })
     //复制
     document.getElementById('serial-copy').addEventListener('click', (e) => {
-        let text = serialLogs.innerText
-        if (text) {
-            copyText(text)
-        }
+        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('')
+        if (text) copyText(text)
     })
     //保存
     document.getElementById('serial-save').addEventListener('click', (e) => {
-        let text = serialLogs.innerText
-        if (text) {
-            saveText(text)
-        }
+        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('')
+        if (text) saveText(text)
     })
     //发送
     document.getElementById('serial-send').addEventListener('click', (e) => {

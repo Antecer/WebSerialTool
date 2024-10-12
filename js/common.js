@@ -598,11 +598,11 @@
     }
 
     //发送HEX到串口
-    const regHex = /^([0-9A-Fa-f]{2})+$|^([0-9A-Fa-f]{2})(?:\s+([0-9A-Fa-f]{2}))*$/;
+    const regHex = /^[0-9A-Fa-f]{2}(\s*[0-9A-Fa-f]{2})*$/;
     async function sendHex(hex) {
         const value = hex.trim();
         if (regHex.test(value)) {
-            let data = value.match(/\d\d/g).map(m => parseInt(m, 16))
+            let data = value.match(/[0-9A-Fa-f]{2}/g).map(m => parseInt(m, 16))
             await writeData(Uint8Array.from(data))
         }
         else {

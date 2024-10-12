@@ -478,8 +478,10 @@
         try {
             await navigator.serial.requestPort().then(async (port) => {
                 //关闭旧的串口
-                serialPort?.close()
-                await serialPort?.forget()
+                if (serialOpen) {
+                    await closeSerial();
+                    await serialPort?.forget()
+                }
                 serialPort = port
                 serialStatuChange(true)
             })

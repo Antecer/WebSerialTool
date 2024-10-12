@@ -71,3 +71,17 @@ body {
 .msg-TX {
     color: #888;
 }
+
+/* 隐藏输入框上下箭头 */
+#serial-baud::-webkit-inner-spin-button,
+#serial-baud::-webkit-outer-spin-button,
+#serial-buffer-size::-webkit-inner-spin-button,
+#serial-buffer-size::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+/* 兼容Firefox */
+#serial-baud[type=number],
+#serial-buffer-size[type=number] {
+    -moz-appearance: textfield;
+}

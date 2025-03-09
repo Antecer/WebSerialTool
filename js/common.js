@@ -504,34 +504,22 @@
             stopBits: parseInt(get('serial-stop-bits')),
             parity: get('serial-parity'),
             bufferSize: parseInt(get('serial-buffer-size')),
-            flowControl: get('serial-flow-control'),
-        }
+            flowControl: get('serial-flow-control') || 'none', // 默认无流控
+        };
 
         serialPort.open(SerialOptions)
             .then(() => {
-                serialToggle.innerHTML = '关闭串口'
-                serialOpen = true
-                serialClose = false
-                disabledOptions(true)
-                localStorage.setItem('serialOptions', JSON.stringify(SerialOptions))
-                readData()
+                serialToggle.innerHTML = '关闭串口';
+                serialOpen = true;
+                serialClose = false;
+                disabledOptions(true);
+                localStorage.setItem('serialOptions', JSON.stringify(SerialOptions));
+                readData();
             })
             .catch((e) => {
-                closeSerial()
-                serialPort.open(SerialOptions)
-                    .then(() => {
-                        serialToggle.innerHTML = '关闭串口'
-                        serialOpen = true
-                        serialClose = false
-                        disabledOptions(true)
-                        localStorage.setItem('serialOptions', JSON.stringify(SerialOptions))
-                        readData()
-                    })
-                    .catch((e) => {
-                        closeSerial()
-                        showMsg('打开串口失败:' + e.toString())
-                    })
-            })
+                closeSerial();
+                showMsg('打开串口失败:' + e.toString());
+            });
     }
 
     //禁用或恢复串口选项
@@ -595,6 +583,12 @@
     }
     //串口数据收发
     async function send() {
+        const now = Date.now();
+        if (now - lastSendTime < 20) {
+            return; // 强制 20ms 发送间隔
+        }
+        lastSendTime = now;
+
         let content = document.getElementById('serial-send-content').value
         if (!content) {
             addLogErr('发送内容为空')
@@ -643,57 +637,86 @@
     //读串口数据
     async function readData() {
         while (serialOpen && serialPort.readable) {
-            reader = serialPort.readable.getReader()
+            reader = serialPort.readable.getReader();
             try {
                 while (true) {
-                    const { value, done } = await reader.read()
+                    const { value, done } = await reader.read();
                     if (done) {
-                        break
+                        console.log('Reader done, breaking loop'); // 添加日志：确认读取完成
+                        break;
                     }
-                    dataReceived(value)
+                    dataReceived(value);
                 }
             } catch (error) {
+                console.error('Error reading data:', error); // 添加日志：捕获读取错误
             } finally {
-                reader.releaseLock()
+                reader.releaseLock();
             }
         }
-        await serialPort.close()
+        await serialPort.close();
     }
 
-    // 串口数据分包函数
     function dataReceived(data) {
-        serialData.push(...data)
-        if (toolOptions.timeOut == 0) {
-            for (let i = serialData.length; i-- > 0;) {
-                if (serialData[i] == 10) {
-                    ++i;
-                    let arrLt = serialData.slice(0, i);
-                    serialData = serialData.slice(i);
-                    addLog(arrLt, true)
-                }
-            }
-            return
+        serialData.push(...data);
+        const bufferSizeInBytes = serialData.length * Uint8Array.BYTES_PER_ELEMENT;
+        if (bufferSizeInBytes > 1024 * 1024) { // 超过 1MB 清理缓冲区
+            serialData = serialData.slice(-1024); // 保留最近 1KB 数据
         }
-        // 清除之前的时钟
-        clearTimeout(serialTimer)
-        serialTimer = setTimeout(() => {
-            console.log(serialData);
-            addLog(serialData, true)    // 超时打印
-            serialData = []
-        }, toolOptions.timeOut)
+        console.log('Data received from serial port:', data); // 确认接收到的数据
+
+        // 将数据发送到 Web Worker 进行处理
+        worker.postMessage({ action: 'processData', data: new Uint8Array(serialData), timeOut: toolOptions.timeOut });
     }
 
-    //添加日志
+    // 引入 Web Worker
+    const worker = new Worker('js/worker.js');
+
+    // 监听 Web Worker 返回的消息
+    worker.onmessage = function (event) {
+        const { action, frames } = event.data;
+        if (action === 'processedData') {
+            frames.forEach(frame => {
+                addLog(frame, true); // 将每一帧数据添加到日志
+            });
+            serialData = []; // 清空已处理的数据
+        }
+    };
+
+    // 批量渲染：使用 requestAnimationFrame 合并 DOM 操作
+    let pendingLogs = [];
     function addLog(data, isReceive = true) {
-        let time = formatDate(new Date())
-        let msgSrc = isReceive ? 'RX' : 'TX'
-        let msgType = toolOptions.logType == 'hex';
-        let msgHex = data.map(d => d.toString(16).toUpperCase().padStart(2, '0')).join(' ')
-        let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(Uint8Array.from(data))   // todo: 后续从UI获取编码方式
-        const template = `<div class="msg-${msgSrc}" title="${msgSrc} [${time}] ${toolOptions.logType == 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`
-        serialLogs.insertAdjacentHTML('beforeend', template);
+        pendingLogs.push({ data, isReceive });
+        if (!renderScheduled) {
+            renderScheduled = true;
+            requestAnimationFrame(renderLogs);
+        }
+    }
+
+    let renderScheduled = false;
+    function renderLogs() {
+        const batchSize = 50; // 每帧最多渲染 50 条数据
+        for (let i = 0; i < Math.min(batchSize, pendingLogs.length); i++) {
+            const { data, isReceive } = pendingLogs.shift();
+            let time = formatDate(new Date());
+            let msgSrc = isReceive ? 'RX' : 'TX';
+            let msgType = toolOptions.logType === 'hex';
+            let msgHex = data.map(d => d.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+            let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(Uint8Array.from(data));
+            const template = `<div class="msg-${msgSrc}" title="${msgSrc} [${time}] ${toolOptions.logType === 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`;
+            serialLogs.insertAdjacentHTML('beforeend', template);
+
+            // 虚拟滚动：保持 DOM 节点数小于 1000
+            if (serialLogs.children.length > 1000) {
+                serialLogs.removeChild(serialLogs.firstChild);
+            }
+        }
+        if (pendingLogs.length > 0) {
+            requestAnimationFrame(renderLogs);
+        } else {
+            renderScheduled = false;
+        }
         if (toolOptions.autoScroll) {
-            serialLogs.scrollTop = serialLogs.scrollHeight
+            serialLogs.scrollTop = serialLogs.scrollHeight;
         }
     }
 
@@ -706,18 +729,14 @@
     }
 
     //复制文本
-    function copyText(text) {
-        let textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.readOnly = 'readonly'
-        textarea.style.position = 'absolute'
-        textarea.style.left = '-9999px'
-        document.body.appendChild(textarea)
-        textarea.select()
-        textarea.setSelectionRange(0, textarea.value.length)
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-        showMsg('已复制到剪贴板')
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            showMsg('已复制到剪贴板');
+        } catch (err) {
+            console.error('复制失败:', err);
+            showMsg('复制失败');
+        }
     }
 
     //保存文本

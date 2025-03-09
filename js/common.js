@@ -617,12 +617,6 @@
     }
     //串口数据收发
     async function send() {
-        const now = Date.now();
-        if (now - lastSendTime < 20) {
-            return; // 强制 20ms 发送间隔
-        }
-        lastSendTime = now;
-
         let content = document.getElementById('serial-send-content').value
         if (!content) {
             addLogErr('发送内容为空')
@@ -653,7 +647,11 @@
         writeData((new TextEncoder(toolOptions.textEncoding)).encode(text))
     }
 
-    //写串口数据
+    /**
+     * 写串口数据
+     * @param {Uint8Array} data 
+     * @returns 
+     */
     async function writeData(data) {
         if (!serialPort || !serialPort.writable) {
             addLogErr('请先打开串口再发送数据')
@@ -661,11 +659,11 @@
         }
         const writer = serialPort.writable.getWriter()
         if (toolOptions.addCRLF) {
-            data = new Uint8Array([...data, 0x0d, 0x0a])
+            data = new Uint8Array([...data, 0x0D, 0x0A])
         }
         await writer.write(data)
         writer.releaseLock()
-        addLog([...data], false)
+        addLog(data, false)
     }
 
     // 读串口数据
@@ -750,6 +748,11 @@
 
     // 批量渲染：使用 requestAnimationFrame 合并 DOM 操作
     let pendingLogs = [];
+    /**
+     * 输出串口数据
+     * @param {Uint8Array} data 
+     * @param {Boolean} isReceive 
+     */
     function addLog(data, isReceive = true) {
         pendingLogs.push({ data, isReceive });
         if (!renderScheduled) {
@@ -759,17 +762,17 @@
     }
 
     let renderScheduled = false;
+    const HexChars = [..."0123456789ABCDEF"];
     function renderLogs() {
         const batchSize = 50; // 每帧最多渲染 50 条数据
         for (let i = 0; i < Math.min(batchSize, pendingLogs.length); i++) {
             const { data, isReceive } = pendingLogs.shift();
-            // let time = formatDate(new Date());
             let time = new Date().format("yyyy-MM-dd hh:mm:ss.fff");
             let msgSrc = isReceive ? 'RX' : 'TX';
             let msgType = toolOptions.logType === 'hex';
             console.log('renderLog:', data);
-            let msgHex = data.map(d => d.toString(16).toUpperCase().padStart(2, '0')).join(' ');
-            let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(Uint8Array.from(data));
+            let msgHex = [...data].map(d => `${HexChars[d >>> 4]}${HexChars[d & 0xF]}`).join(' ');
+            let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(data);
             const template = `<div class="msg-${msgSrc}" title="${msgSrc} [${time}] ${toolOptions.logType === 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`;
             serialLogs.insertAdjacentHTML('beforeend', template);
 

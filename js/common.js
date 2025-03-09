@@ -1,4 +1,38 @@
 (function () {
+    // 创建sleep方法
+    const Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    /**
+     * 日期格式化器,用法: new Date().format("yyyy-MM-dd hh:mm:ss.fff")
+     */
+    Date.prototype.format = function (exp) {
+        let t = {
+            'y+': this.getFullYear(), // 年
+            'M+': this.getMonth() + 1, // 月
+            'd+': this.getDate(), // 日
+            'h+': this.getHours(), // 时
+            'm+': this.getMinutes(), // 分
+            's+': this.getSeconds(), // 秒
+            'f+': this.getMilliseconds(), // 毫秒
+            'q+': Math.floor(this.getMonth() / 3 + 1), // 季度
+        };
+        for (let k in t) {
+            let m = exp.match(k);
+            if (m) {
+                switch (k) {
+                    case 'y+':
+                        exp = exp.replace(m[0], t[k].toString().slice(-m[0].length));
+                        break;
+                    case 'f+':
+                        exp = exp.replace(m[0], t[k].toString().padStart(3, 0).slice(0, m[0].length));
+                        break;
+                    default:
+                        exp = exp.replace(m[0], m[0].length == 1 ? t[k] : t[k].toString().padStart(m[0].length, 0));
+                }
+            }
+        }
+        return exp;
+    };
+
     if (!('serial' in navigator)) {
         alert('当前浏览器不支持串口操作,请更换Chrome浏览器')
     }
@@ -634,21 +668,19 @@
         addLog([...data], false)
     }
 
-    //读串口数据
+    // 读串口数据
     async function readData() {
         while (serialOpen && serialPort.readable) {
             reader = serialPort.readable.getReader();
             try {
                 while (true) {
                     const { value, done } = await reader.read();
-                    if (done) {
-                        console.log('Reader done, breaking loop'); // 添加日志：确认读取完成
-                        break;
-                    }
-                    dataReceived(value);
+                    if (done) break;
+                    // 缓存接收到的数据 Uint8Array
+                    serialData.push(value);
                 }
             } catch (error) {
-                console.error('Error reading data:', error); // 添加日志：捕获读取错误
+                console.error('读取错误:', error);
             } finally {
                 reader.releaseLock();
             }
@@ -656,31 +688,65 @@
         await serialPort.close();
     }
 
-    function dataReceived(data) {
-        serialData.push(...data);
-        const bufferSizeInBytes = serialData.length * Uint8Array.BYTES_PER_ELEMENT;
-        if (bufferSizeInBytes > 1024 * 1024) { // 超过 1MB 清理缓冲区
-            serialData = serialData.slice(-1024); // 保留最近 1KB 数据
+    // 异步输出串口数据
+    (async () => {
+        let cacheData = new Uint8Array(0);
+        let lastFrameTime = null;
+        while (true) {
+            await Sleep(100);
+            if (serialData.length > 0) {
+                // 计算所有 Uint8Array 的总长度
+                let totalLength = cacheData.length + serialData.reduce((acc, arr) => acc + arr.length, 0);
+                // 创建一个新的 Uint8Array 来存储所有数据
+                let combinedData = new Uint8Array(totalLength);
+                combinedData.set(cacheData, 0);
+                // 将每个 Uint8Array 的内容复制到新的 Uint8Array 中
+                for (let offset = cacheData.length; offset < totalLength;) {
+                    let currentArray = serialData.shift();
+                    combinedData.set(currentArray, offset);
+                    offset += currentArray.length;
+                }
+                cacheData = combinedData;
+            }
+            if (cacheData.length == 0) continue;
+
+            const lines = [];
+            const timeout = toolOptions.timeOut;
+            if (!lastFrameTime) lastFrameTime = Date.now();
+            switch (timeout) {
+                case 0:
+                    while (true) {
+                        let index = cacheData.indexOf(0x0A);
+                        if (index !== -1) {
+                            lines.push(cacheData.slice(0, index));
+                            cacheData = cacheData.slice(index + 1);
+                            lastFrameTime = Date.now();
+                        } else {
+                            if (Date.now() - lastFrameTime > 1000) {
+                                lastFrameTime = Date.now();
+                                lines.push(cacheData);
+                                cacheData = new Uint8Array(0);
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                case -1:
+                    lines.push(cacheData);
+                    cacheData = new Uint8Array(0);
+                    lastFrameTime = Date.now();
+                    break;
+                default:
+                    if (Date.now() - lastFrameTime > timeout) {
+                        lastFrameTime = Date.now();
+                        lines.push(cacheData);
+                        cacheData = new Uint8Array(0);
+                    }
+                    break;
+            }
+            lines.forEach(line => addLog(line));
         }
-        console.log('Data received from serial port:', data); // 确认接收到的数据
-
-        // 将数据发送到 Web Worker 进行处理
-        worker.postMessage({ action: 'processData', data: new Uint8Array(serialData), timeOut: toolOptions.timeOut });
-    }
-
-    // 引入 Web Worker
-    const worker = new Worker('js/worker.js');
-
-    // 监听 Web Worker 返回的消息
-    worker.onmessage = function (event) {
-        const { action, frames } = event.data;
-        if (action === 'processedData') {
-            frames.forEach(frame => {
-                addLog(frame, true); // 将每一帧数据添加到日志
-            });
-            serialData = []; // 清空已处理的数据
-        }
-    };
+    })();
 
     // 批量渲染：使用 requestAnimationFrame 合并 DOM 操作
     let pendingLogs = [];
@@ -697,9 +763,11 @@
         const batchSize = 50; // 每帧最多渲染 50 条数据
         for (let i = 0; i < Math.min(batchSize, pendingLogs.length); i++) {
             const { data, isReceive } = pendingLogs.shift();
-            let time = formatDate(new Date());
+            // let time = formatDate(new Date());
+            let time = new Date().format("yyyy-MM-dd hh:mm:ss.fff");
             let msgSrc = isReceive ? 'RX' : 'TX';
             let msgType = toolOptions.logType === 'hex';
+            console.log('renderLog:', data);
             let msgHex = data.map(d => d.toString(16).toUpperCase().padStart(2, '0')).join(' ');
             let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(Uint8Array.from(data));
             const template = `<div class="msg-${msgSrc}" title="${msgSrc} [${time}] ${toolOptions.logType === 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`;
@@ -734,8 +802,7 @@
             await navigator.clipboard.writeText(text);
             showMsg('已复制到剪贴板');
         } catch (err) {
-            console.error('复制失败:', err);
-            showMsg('复制失败');
+            showMsg(`复制失败: ${err.message}`);
         }
     }
 

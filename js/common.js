@@ -770,8 +770,7 @@
             let time = new Date().format("yyyy-MM-dd hh:mm:ss.fff");
             let msgSrc = isReceive ? 'RX' : 'TX';
             let msgType = toolOptions.logType === 'hex';
-            console.log('renderLog:', data);
-            let msgHex = [...data].map(d => `${HexChars[d >>> 4]}${HexChars[d & 0xF]}`).join(' ');
+            let msgHex = [...data].map(d => HexChars[d >>> 4] + HexChars[d & 0xF]).join(' ');
             let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(data);
             const template = `<div class="msg-${msgSrc}" title="${msgSrc} [${time}] ${toolOptions.logType === 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`;
             serialLogs.insertAdjacentHTML('beforeend', template);

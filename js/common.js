@@ -769,11 +769,14 @@
             const { data, isReceive } = pendingLogs.shift();
             let time = new Date().format("yyyy-MM-dd hh:mm:ss.fff");
             let msgSrc = isReceive ? 'RX' : 'TX';
-            let msgType = toolOptions.logType === 'hex';
+            let msgType = toolOptions.logType.toLowerCase() === 'hex';
             let msgHex = [...data].map(d => HexChars[d >>> 4] + HexChars[d & 0xF]).join(' ');
-            let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(data).replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-            const template = `<div class="msg-${msgSrc}" title="${msgSrc} [${time}] ${toolOptions.logType === 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}">${msgType ? msgHex : msgStr}</div>`;
-            serialLogs.insertAdjacentHTML('beforeend', template);
+            let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(data);
+            const tempNode = document.createElement('div');
+            tempNode.className = `msg-${msgSrc}`;
+            tempNode.title = `${msgSrc} [${time}] ${toolOptions.logType.toLowerCase() === 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}`;
+            tempNode.textContent = `${msgType ? msgHex : msgStr}`;
+            serialLogs.insertAdjacentElement('beforeend', tempNode);
 
             // 虚拟滚动：保持 DOM 节点数小于 1000
             if (serialLogs.children.length > 1000) {

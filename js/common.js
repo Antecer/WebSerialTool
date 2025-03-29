@@ -486,12 +486,12 @@
     })
     //复制
     document.getElementById('serial-copy').addEventListener('click', (e) => {
-        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('')
+        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('\n')
         if (text) copyText(text)
     })
     //保存
     document.getElementById('serial-save').addEventListener('click', (e) => {
-        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('')
+        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('\n')
         if (text) saveText(text)
     })
     //发送

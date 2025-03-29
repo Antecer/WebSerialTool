@@ -482,17 +482,16 @@
 
     //清空
     document.getElementById('serial-clear').addEventListener('click', (e) => {
-        serialLogs.innerHTML = ''
+        serialLogs.innerHTML = '';
+        cachedLogs = [];
     })
     //复制
     document.getElementById('serial-copy').addEventListener('click', (e) => {
-        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('\n')
-        if (text) copyText(text)
+        copyText(cachedLogs.join(''));
     })
     //保存
     document.getElementById('serial-save').addEventListener('click', (e) => {
-        let text = Array.from(serialLogs.querySelectorAll(':scope>div')).map(item => item.innerText).join('\n')
-        if (text) saveText(text)
+        saveText(cachedLogs.join(''));
     })
     //发送
     document.getElementById('serial-send').addEventListener('click', (e) => {
@@ -748,6 +747,7 @@
 
     // 批量渲染：使用 requestAnimationFrame 合并 DOM 操作
     let pendingLogs = [];
+    let cachedLogs = [];
     /**
      * 输出串口数据
      * @param {Uint8Array} data 
@@ -772,6 +772,7 @@
             let msgType = toolOptions.logType.toLowerCase() === 'hex';
             let msgHex = [...data].map(d => HexChars[d >>> 4] + HexChars[d & 0xF]).join(' ');
             let msgStr = (new TextDecoder(toolOptions.textEncoding)).decode(data);
+            cachedLogs.push(msgStr);
             const tempNode = document.createElement('div');
             tempNode.className = `msg-${msgSrc}`;
             tempNode.title = `${msgSrc} [${time}] ${toolOptions.logType.toLowerCase() === 'hex' ? 'STR' : 'HEX'}\n${msgType ? msgStr : msgHex}`;
@@ -781,6 +782,7 @@
             // 虚拟滚动：保持 DOM 节点数小于 1000
             if (serialLogs.children.length > 1000) {
                 serialLogs.removeChild(serialLogs.firstChild);
+                cachedLogs.shift();
             }
         }
         if (pendingLogs.length > 0) {

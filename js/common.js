@@ -764,7 +764,7 @@
     let renderScheduled = false;
     const HexChars = [..."0123456789ABCDEF"];
     function renderLogs() {
-        const batchSize = 50; // 每帧最多渲染 50 条数据
+        const batchSize = 500; // 每帧最多渲染 500 条数据
         for (let i = 0; i < Math.min(batchSize, pendingLogs.length); i++) {
             const { data, isReceive } = pendingLogs.shift();
             let time = new Date().format("yyyy-MM-dd hh:mm:ss.fff");
@@ -779,8 +779,8 @@
             tempNode.textContent = `${msgType ? msgHex : msgStr}`;
             serialLogs.insertAdjacentElement('beforeend', tempNode);
 
-            // 虚拟滚动：保持 DOM 节点数小于 1000
-            if (serialLogs.children.length > 1000) {
+            // 虚拟滚动：保持 DOM 节点数小于 100K
+            if (serialLogs.children.length > 100000) {
                 serialLogs.removeChild(serialLogs.firstChild);
                 cachedLogs.shift();
             }
